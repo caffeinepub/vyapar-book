@@ -1,0 +1,61 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+    /* Teal brand #0F7A86 */
+    --primary: 0.52 0.1 209;
+    --primary-foreground: 1 0 0;
+    /* White background */
+    --background: 1 0 0;
+    --foreground: 0.14 0.03 250;
+    /* Light aqua #EAF7FA */
+    --card: 1 0 0;
+    --card-foreground: 0.14 0.03 250;
+    --popover: 1 0 0;
+    --popover-foreground: 0.14 0.03 250;
+    /* Light aqua secondary */
+    --secondary: 0.97 0.025 200;
+    --secondary-foreground: 0.28 0.05 218;
+    --muted: 0.97 0.025 200;
+    --muted-foreground: 0.5 0.02 225;
+    --accent: 0.94 0.04 200;
+    --accent-foreground: 0.52 0.1 209;
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 1 0 0;
+    /* Border */
+    --border: 0.91 0.02 200;
+    --input: 0.91 0.02 200;
+    --ring: 0.52 0.1 209;
+    /* Charts */
+    --chart-1: 0.52 0.1 209;
+    --chart-2: 0.65 0.15 160;
+    --chart-3: 0.7 0.18 50;
+    --chart-4: 0.6 0.18 300;
+    --chart-5: 0.577 0.245 27.325;
+    /* Success / profit */
+    --success: 0.65 0.18 150;
+    --success-foreground: 1 0 0;
+    /* Navy sidebar */
+    --sidebar: 0.28 0.05 218;
+    --sidebar-foreground: 0.97 0.01 200;
+    --sidebar-primary: 0.52 0.1 209;
+    --sidebar-primary-foreground: 1 0 0;
+    --sidebar-accent: 0.35 0.05 218;
+    --sidebar-accent-foreground: 0.97 0.01 200;
+    --sidebar-border: 0.35 0.05 218;
+    --sidebar-ring: 0.52 0.1 209;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  }
+}
