@@ -3,12 +3,14 @@ import {
   BarChart3,
   BookOpen,
   LayoutDashboard,
+  Loader2,
   Receipt,
   Settings,
   ShoppingCart,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useActor } from "./hooks/useActor";
+import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import Analytics from "./pages/Analytics";
 import CashBook from "./pages/CashBook";
 import Dashboard from "./pages/Dashboard";
@@ -40,12 +42,78 @@ const NAV_ITEMS: {
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const { actor, isFetching } = useActor();
+  const { identity, login, isInitializing, loginStatus } =
+    useInternetIdentity();
 
   useEffect(() => {
     if (actor && !isFetching) {
       actor.initialize().catch(() => {});
     }
   }, [actor, isFetching]);
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!identity) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="w-full max-w-md text-center space-y-8">
+          {/* Logo / Brand */}
+          <div className="space-y-2">
+            <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto shadow-lg">
+              <BookOpen className="w-8 h-8 text-primary-foreground" />
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Vyapar Book
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              Your business accounting companion
+            </p>
+          </div>
+
+          {/* Features hint */}
+          <div className="bg-muted/50 rounded-xl p-4 text-left space-y-2">
+            {[
+              "📊 Track daily sales & expenses",
+              "💰 Cash & bank ledger management",
+              "📈 Monthly P&L analytics",
+              "🏷️ Category & tag based insights",
+            ].map((feature) => (
+              <p key={feature} className="text-sm text-muted-foreground">
+                {feature}
+              </p>
+            ))}
+          </div>
+
+          {/* Login button */}
+          <button
+            type="button"
+            data-ocid="auth.login.button"
+            onClick={login}
+            disabled={loginStatus === "logging-in"}
+            className="w-full bg-primary text-primary-foreground rounded-xl py-3.5 font-semibold text-base shadow-md hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {loginStatus === "logging-in" ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Logging in...
+              </>
+            ) : (
+              "Login to Continue"
+            )}
+          </button>
+
+          <p className="text-xs text-muted-foreground">
+            Secure login powered by Internet Identity
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col max-w-md mx-auto relative">
