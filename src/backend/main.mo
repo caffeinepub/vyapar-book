@@ -5,7 +5,6 @@ import Time "mo:core/Time";
 import Nat "mo:core/Nat";
 import Array "mo:core/Array";
 import Order "mo:core/Order";
-import List "mo:core/List";
 import Iter "mo:core/Iter";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
@@ -138,40 +137,8 @@ actor {
   var nextProfitId : UniqueId = 1;
   var nextLedgerId : UniqueId = 1;
 
-  // User Profile Management
-  public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view profiles");
-    };
-    userProfiles.get(caller);
-  };
-
-  public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view profiles");
-    };
-    if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own profile");
-    };
-    userProfiles.get(user);
-  };
-
-  public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can save profiles");
-    };
-    userProfiles.add(caller, profile);
-  };
-
-  // Initialization of default categories
-  public shared ({ caller }) func initialize() : async () {
-    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
-      Runtime.trap("Unauthorized: Only admins can initialize the system");
-    };
-
-    let currentTime = Time.now();
-
-    // Initialize default categories if not already present
+  // Internal helper to seed default categories (idempotent)
+  func seedDefaultCategories() {
     let defaultCategoryNames = [
       "Rent",
       "Stock Purchase",
@@ -179,16 +146,12 @@ actor {
       "Transport",
       "Miscellaneous",
     ];
-
     for (name in defaultCategoryNames.values()) {
       let existingCategory = categories.values().find(
         func(category) { category.name == name }
       );
-
       switch (existingCategory) {
-        case (?_category) {
-          // Category already exists, do nothing
-        };
+        case (?_category) {};
         case (null) {
           let categoryId = nextCategoryId;
           nextCategoryId += 1;
@@ -203,10 +166,43 @@ actor {
     };
   };
 
+  // Seed default categories at canister startup
+  seedDefaultCategories();
+
+  // User Profile Management
+  public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
+    };
+    userProfiles.get(caller);
+  };
+
+  public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
+    };
+    userProfiles.get(user);
+  };
+
+  public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
+    };
+    userProfiles.add(caller, profile);
+  };
+
+  // Initialize: any authenticated user can call this (idempotent, seeds default categories)
+  public shared ({ caller }) func initialize() : async () {
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
+    };
+    seedDefaultCategories();
+  };
+
   // Expense Categories
   public shared ({ caller }) func createExpenseCategory(name : Text) : async Id {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can create expense categories");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
 
     let categoryId = nextCategoryId;
@@ -221,23 +217,23 @@ actor {
   };
 
   public query ({ caller }) func getExpenseCategory(categoryId : Id) : async ?ExpenseCategory {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view expense categories");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
     categories.get(categoryId);
   };
 
   public query ({ caller }) func getAllExpenseCategories() : async [ExpenseCategory] {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view expense categories");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
     categories.values().toArray().sort();
   };
 
   // Tags
   public shared ({ caller }) func createTag(name : Text) : async Id {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can create tags");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
 
     let tagId = nextTagId;
@@ -251,23 +247,23 @@ actor {
   };
 
   public query ({ caller }) func getTag(tagId : Id) : async ?Tag {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view tags");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
     tags.get(tagId);
   };
 
   public query ({ caller }) func getAllTags() : async [Tag] {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view tags");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
     tags.values().toArray().sort(Tag.compareByName);
   };
 
   // Expenses
   public shared ({ caller }) func createExpense(date : Timestamp, amount : Rupiah, categoryId : Id, accountType : AccountType, tagIds : [Id], notes : Text) : async Id {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can create expenses");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
 
     switch (categories.get(categoryId)) {
@@ -291,22 +287,22 @@ actor {
   };
 
   public query ({ caller }) func getExpense(expenseId : Id) : async ?ExpenseEntry {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view expenses");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
     expenses.get(expenseId);
   };
 
   public query ({ caller }) func getAllExpenses() : async [ExpenseEntry] {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view expenses");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
     expenses.values().toArray().sort(ExpenseEntry.compareByDate);
   };
 
   public shared ({ caller }) func deleteExpense(expenseId : Id) : async () {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can delete expenses");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
 
     let existingExpense = expenses.get(expenseId);
@@ -321,8 +317,8 @@ actor {
 
   // Sales
   public shared ({ caller }) func createSale(date : Timestamp, cashAmount : Rupiah, onlineAmount : Rupiah, notes : Text) : async Id {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can create sales");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
 
     let saleId = nextSaleId;
@@ -339,22 +335,22 @@ actor {
   };
 
   public query ({ caller }) func getSale(saleId : Id) : async ?SaleEntry {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view sales");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
     sales.get(saleId);
   };
 
   public query ({ caller }) func getAllSales() : async [SaleEntry] {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view sales");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
     sales.values().toArray();
   };
 
   public shared ({ caller }) func deleteSale(saleId : Id) : async () {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can delete sales");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
     let existingSale = sales.get(saleId);
 
@@ -368,8 +364,8 @@ actor {
 
   // Profits
   public shared ({ caller }) func createProfitEntry(date : Timestamp, amount : Rupiah, notes : Text) : async Id {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can create profit entries");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
 
     let profitEntryId = nextProfitId;
@@ -385,22 +381,22 @@ actor {
   };
 
   public query ({ caller }) func getProfitEntry(profitId : Id) : async ?ProfitEntry {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view profit entries");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
     profits.get(profitId);
   };
 
   public query ({ caller }) func getAllProfits() : async [ProfitEntry] {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view profit entries");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
     profits.values().toArray();
   };
 
   public shared ({ caller }) func deleteProfitEntry(profitId : Id) : async () {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can delete profit entries");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
     let existingProfit = profits.get(profitId);
 
@@ -416,8 +412,8 @@ actor {
   public shared ({ caller }) func createLedgerEntry(
     dto : LedgerEntryDTO
   ) : async Id {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can create ledger entries");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
 
     let ledgerEntryId = nextLedgerId;
@@ -437,23 +433,23 @@ actor {
   };
 
   public query ({ caller }) func getLedgerEntry(ledgerId : Id) : async ?LedgerEntry {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view ledger entries");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
     ledgers.get(ledgerId);
   };
 
   public query ({ caller }) func getAllLedgerEntries() : async [LedgerEntry] {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view ledger entries");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
     ledgers.values().toArray();
   };
 
   // Account Balances Calculation
   public query ({ caller }) func getAccountBalances() : async AccountBalances {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view account balances");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
 
     let cashInCredits = sales.values().toArray().foldLeft(0, func(acc, sale) { acc + sale.cashAmount });
@@ -483,7 +479,7 @@ actor {
 
     let cashDebits = cashBookDebits + expensesDebits;
 
-    let cashBalance = cashCredits - cashDebits;
+    let cashBalance = if (cashCredits >= cashDebits) { cashCredits - cashDebits } else { 0 };
 
     let bankInCredits = sales.values().toArray().foldLeft(0, func(acc, sale) { acc + sale.onlineAmount });
 
@@ -512,7 +508,7 @@ actor {
 
     let bankDebits = bankBookDebits + bankExpensesDebits;
 
-    let bankBalance = bankCredits - bankDebits;
+    let bankBalance = if (bankCredits >= bankDebits) { bankCredits - bankDebits } else { 0 };
 
     {
       cashBalance;
@@ -521,11 +517,10 @@ actor {
   };
 
   public query ({ caller }) func getAllExpenseCategoriesWithExpenses() : async [(ExpenseCategory, [ExpenseEntry])] {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can view expense data");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be authenticated");
     };
 
-    // For each category, get associated expenses
     categories.values().toArray().map(
       func(category) {
         let categoryExpenses = expenses.values().toArray().filter(
